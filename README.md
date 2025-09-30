@@ -57,6 +57,7 @@ There is an example of using:
 ## Features
 
 - **📦 Bundle Models with App:** Ship models directly with your app for instant offline availability - models are copied only once on first launch
+- **🔧 Multi-Part File Support:** Automatically handles large models (>2GB) by splitting and assembling parts - solves Android's 2GB asset limit
 - **Local Execution:** Run Gemma models directly on user devices for enhanced privacy and offline functionality.
 - **Platform Support:** Compatible with iOS, Android, and Web platforms.
 - **🖼️ Multimodal Support:** Text + Image input with Gemma 3 Nano vision models 
@@ -276,7 +277,43 @@ void main() async {
 - ✓ One-time setup on first launch
 - ✓ Efficient: checks SharedPreferences before copying
 
-**📚 See:** `BUNDLED_MODELS_GUIDE.md` for complete guide
+**🔧 Large Models (>2GB):**
+
+Android has a 2GB limit for individual asset files. For larger models, flutter_gemma automatically supports multi-part files:
+
+```bash
+# 1. Split your large model using the provided script
+./scripts/split_model.sh path/to/gemma-7b-it.bin 1900
+
+# This creates: gemma-7b-it.bin.part1, .part2, .part3, etc.
+```
+
+```yaml
+# 2. Add ALL parts to pubspec.yaml
+flutter:
+  assets:
+    - assets/models/gemma-7b-it.bin.part1
+    - assets/models/gemma-7b-it.bin.part2
+    - assets/models/gemma-7b-it.bin.part3
+```
+
+```dart
+// 3. Use the base filename (parts are auto-detected!)
+await BundledModelInstaller.installIfNeeded(
+  InferenceModelSpec(
+    name: 'gemma-7b',
+    modelUrl: 'asset://assets/models/gemma-7b-it.bin',  // Base filename only
+  ),
+);
+```
+
+The installer automatically:
+- ✓ Detects all `.part1`, `.part2`, etc. files
+- ✓ Assembles them into the complete model file
+- ✓ Verifies file integrity
+- ✓ Falls back to single file if no parts exist (backward compatible)
+
+**📚 See:** `BUNDLING_LARGE_MODELS.md` for complete guide with troubleshooting
 
 ---
 
