@@ -26,6 +26,7 @@ part '../core/model_management/utils/resume_checker.dart';
 part '../core/model_management/managers/preferences_manager.dart';
 part '../core/model_management/managers/download_engine.dart';
 part '../core/model_management/managers/unified_model_manager.dart';
+part '../core/model_management/managers/bundled_model_installer.dart';
 
 class MobileInferenceModelSession extends InferenceModelSession {
   final ModelType modelType;
