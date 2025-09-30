@@ -12,6 +12,42 @@
 
 Bring the power of Google's lightweight Gemma language models directly to your Flutter applications. With Flutter Gemma, you can seamlessly incorporate advanced AI capabilities into your iOS and Android apps, all without relying on external servers.
 
+## 🚀 Quick Start: Bundle a Model with Your App
+
+Get started in 3 steps - bundle a model directly with your app for instant offline AI:
+
+```dart
+// 1. Add to pubspec.yaml
+flutter:
+  assets:
+    - assets/models/gemma-2b-it.bin
+
+// 2. Install on first launch
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  await BundledModelInstaller.installIfNeeded(
+    InferenceModelSpec(
+      name: 'gemma-2b',
+      modelUrl: 'asset://assets/models/gemma-2b-it.bin',
+    ),
+  );
+  
+  runApp(MyApp());
+}
+
+// 3. Use it!
+final model = await FlutterGemmaPlugin.instance.createModel(
+  modelType: ModelType.gemmaIt,
+);
+final session = model.createSession();
+final response = await session.getResponse(
+  message: Message.user(text: 'Hello!'),
+);
+```
+
+✅ Model is copied **only once** on first launch, then instantly available forever!
+
 There is an example of using:
 
 <p align="center">
@@ -20,6 +56,7 @@ There is an example of using:
 
 ## Features
 
+- **📦 Bundle Models with App:** Ship models directly with your app for instant offline availability - models are copied only once on first launch
 - **Local Execution:** Run Gemma models directly on user devices for enhanced privacy and offline functionality.
 - **Platform Support:** Compatible with iOS, Android, and Web platforms.
 - **🖼️ Multimodal Support:** Text + Image input with Gemma 3 Nano vision models 
@@ -195,8 +232,125 @@ final gemma = FlutterGemmaPlugin.instance;
 final modelManager = gemma.modelManager;
 ```
 
-Place the model in the assets or upload it to a network drive, such as Firebase.
-#### ATTENTION!! You do not need to load the model every time the application starts; it is stored in the system files and only needs to be done once. Please carefully review the example application. You should use loadAssetModel and loadNetworkModel methods only when you need to upload the model to device
+## 📦 Model Distribution Strategies
+
+Flutter Gemma supports **three ways** to distribute models with your app:
+
+### 🎯 Recommended: Bundle Models with App (Offline-First)
+
+**Best for:** Apps that need to work offline immediately after installation.
+
+```dart
+import 'package:flutter_gemma/flutter_gemma.dart';
+
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Install bundled model (only copies once on first launch)
+  await BundledModelInstaller.installIfNeeded(
+    InferenceModelSpec(
+      name: 'gemma-2b',
+      modelUrl: 'asset://assets/models/gemma-2b-it.bin',
+    ),
+  );
+  
+  runApp(MyApp());
+}
+```
+
+**Setup:**
+1. Add model to `assets/models/` folder
+2. Declare in `pubspec.yaml`:
+   ```yaml
+   flutter:
+     assets:
+       - assets/models/gemma-2b-it.bin
+   ```
+3. Model is copied to device storage **only once** on first launch
+4. Subsequent launches skip the copy (instant availability!)
+
+**✅ Benefits:**
+- ✓ Works offline immediately
+- ✓ No download wait time
+- ✓ Guaranteed model availability
+- ✓ One-time setup on first launch
+- ✓ Efficient: checks SharedPreferences before copying
+
+**📚 See:** `BUNDLED_MODELS_GUIDE.md` for complete guide
+
+---
+
+### 🌐 Download from Network (Flexible Updates)
+
+**Best for:** Apps that need to update models without app updates.
+
+```dart
+final modelManager = FlutterGemmaPlugin.instance.modelManager;
+
+// Download with progress tracking
+modelManager.downloadModelFromNetworkWithProgress(
+  'https://example.com/model.bin'
+).listen(
+  (progress) => print('Progress: $progress%'),
+  onDone: () => print('Download complete'),
+);
+```
+
+**✅ Benefits:**
+- ✓ Smaller initial app size
+- ✓ Update models without app updates
+- ✓ Download on-demand
+
+**❌ Trade-offs:**
+- Network required on first launch
+- First-time wait for download
+
+---
+
+### 🔀 Hybrid Approach (Best of Both)
+
+Bundle a small model, allow downloading larger ones:
+
+```dart
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  
+  // Bundle small model for offline use
+  await BundledModelInstaller.installIfNeeded(
+    InferenceModelSpec(
+      name: 'gemma-2b',  // 1.5GB
+      modelUrl: 'asset://assets/models/gemma-2b-it.bin',
+    ),
+  );
+  
+  runApp(MyApp());
+}
+
+// Later, optionally download larger model
+await modelManager.ensureModelReady(
+  'gemma-7b',
+  'https://example.com/gemma-7b-it.bin',  // 4GB
+);
+```
+
+---
+
+### ⚠️ Important Notes
+
+**You do NOT need to load models on every app launch!**
+
+Once installed (via bundling or download), models are:
+- ✅ Stored in device filesystem
+- ✅ Registered in SharedPreferences
+- ✅ Ready for immediate use
+- ✅ Persist across app restarts
+
+**Only install models when:**
+- First time app launches
+- User wants to download a new model
+- Model needs updating
+
+Place the model in the assets (for bundling) or upload it to a network drive, such as Firebase (for downloads)
 
 ## Usage
 1.**Loading Models from assets (available only in debug mode):**
