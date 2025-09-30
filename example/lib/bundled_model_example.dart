@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_gemma/flutter_gemma.dart';
+import 'package:flutter_gemma/mobile/flutter_gemma_mobile.dart';
 
 /// Example showing how to bundle and use a model with your app
 /// 
@@ -40,7 +41,6 @@ class _BundledModelExampleState extends State<BundledModelExample> {
       final modelSpec = InferenceModelSpec(
         name: 'gemma-2b-bundled',
         modelUrl: 'asset://assets/models/gemma-2b-it.bin',
-        replacePolicy: ModelReplacePolicy.keep,
       );
 
       // Check if already installed
@@ -99,10 +99,9 @@ class _BundledModelExampleState extends State<BundledModelExample> {
     });
 
     try {
-      final session = _model!.createSession();
-      final response = await session.getResponse(
-        message: Message.user(text: 'Hello! Tell me a short joke.'),
-      );
+      final session = await _model!.createSession();
+      await session.addQueryChunk(const Message(text: 'Hello! Tell me a short joke.', isUser: true));
+      final response = await session.getResponse();
 
       setState(() {
         _status = 'Response:\n$response';
