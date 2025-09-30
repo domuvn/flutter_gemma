@@ -6,13 +6,30 @@ part of '../../../mobile/flutter_gemma_mobile.dart';
 /// 1. Checks if model is already installed (via SharedPreferences)
 /// 2. Only copies from assets if not already present
 /// 3. Registers model for use without downloading
+/// 4. Supports multi-part files for large models (Android 2GB limit)
+/// 
+/// **Multi-part file support:**
+/// For models larger than 2GB (Android asset limit), split the file into parts:
+/// - `model.bin.part1`, `model.bin.part2`, etc.
+/// - The installer auto-detects and assembles parts automatically
+/// - Single files still work (backward compatible)
 /// 
 /// Usage:
 /// ```dart
+/// // Single file
 /// await BundledModelInstaller.installIfNeeded(
 ///   InferenceModelSpec(
 ///     name: 'gemma-2b',
 ///     modelUrl: 'asset://assets/models/gemma-2b-it.bin',
+///   ),
+/// );
+/// 
+/// // Multi-part (auto-detected)
+/// // Just reference the base filename, parts are auto-detected
+/// await BundledModelInstaller.installIfNeeded(
+///   InferenceModelSpec(
+///     name: 'gemma-7b',
+///     modelUrl: 'asset://assets/models/gemma-7b-it.bin',  // Parts: .bin.part1, .bin.part2...
 ///   ),
 /// );
 /// ```
@@ -95,6 +112,12 @@ class BundledModelInstaller {
   }
 
   /// Copies a single file from Flutter assets to file system
+  /// 
+  /// Supports multi-part files (e.g., model.bin.part1, model.bin.part2)
+  /// for models larger than Android's 2GB asset limit.
+  /// 
+  /// Auto-detects if part files exist and assembles them automatically.
+  /// Falls back to single file copy if no parts are found.
   static Future<void> _copyFromAsset(
     String assetPath,
     String targetPath,
@@ -103,24 +126,118 @@ class BundledModelInstaller {
     try {
       debugPrint('BundledModelInstaller: Copying $assetPath -> $targetPath');
       
-      // Load asset data
-      final assetData = await rootBundle.load(assetPath);
-      final bytes = assetData.buffer.asUint8List();
-
-      // Ensure target directory exists
-      final targetFile = File(targetPath);
-      await targetFile.parent.create(recursive: true);
-
-      // Write to target location
-      await targetFile.writeAsBytes(bytes);
-
-      debugPrint('BundledModelInstaller: Copied ${bytes.length} bytes to $targetPath');
+      // Try to detect multi-part files
+      final parts = await _detectPartFiles(assetPath);
+      
+      if (parts.isNotEmpty) {
+        // Multi-part file detected
+        debugPrint('BundledModelInstaller: Detected ${parts.length} parts for $filename');
+        await _assemblePartFiles(parts, targetPath, filename);
+      } else {
+        // Single file - use original logic
+        debugPrint('BundledModelInstaller: Single file detected for $filename');
+        await _copySingleFile(assetPath, targetPath);
+      }
     } catch (e) {
       throw ModelStorageException(
         'Failed to copy asset: $assetPath',
         e,
         '_copyFromAsset',
       );
+    }
+  }
+
+  /// Copies a single file from assets
+  static Future<void> _copySingleFile(String assetPath, String targetPath) async {
+    final assetData = await rootBundle.load(assetPath);
+    final bytes = assetData.buffer.asUint8List();
+
+    // Ensure target directory exists
+    final targetFile = File(targetPath);
+    await targetFile.parent.create(recursive: true);
+
+    // Write to target location
+    await targetFile.writeAsBytes(bytes);
+
+    debugPrint('BundledModelInstaller: Copied ${bytes.length} bytes to $targetPath');
+  }
+
+  /// Detects if multi-part files exist for the given asset path
+  /// 
+  /// Returns a list of part file paths in order (e.g., [path.part1, path.part2])
+  /// Returns empty list if no parts are found
+  static Future<List<String>> _detectPartFiles(String assetPath) async {
+    final parts = <String>[];
+    int partNumber = 1;
+    
+    // Try to find part files (e.g., model.bin.part1, model.bin.part2, etc.)
+    while (true) {
+      final partPath = '$assetPath.part$partNumber';
+      try {
+        // Try to load the part to see if it exists
+        await rootBundle.load(partPath);
+        parts.add(partPath);
+        partNumber++;
+      } catch (e) {
+        // Part doesn't exist, stop searching
+        break;
+      }
+    }
+    
+    return parts;
+  }
+
+  /// Assembles multiple part files into a single file
+  static Future<void> _assemblePartFiles(
+    List<String> partPaths,
+    String targetPath,
+    String filename,
+  ) async {
+    // Ensure target directory exists
+    final targetFile = File(targetPath);
+    await targetFile.parent.create(recursive: true);
+    
+    // Open file for writing
+    final sink = targetFile.openWrite();
+    int totalBytes = 0;
+    
+    try {
+      // Copy each part in order
+      for (int i = 0; i < partPaths.length; i++) {
+        final partPath = partPaths[i];
+        debugPrint('BundledModelInstaller: Copying part ${i + 1}/${partPaths.length}: $partPath');
+        
+        final assetData = await rootBundle.load(partPath);
+        final bytes = assetData.buffer.asUint8List();
+        
+        sink.add(bytes);
+        totalBytes += bytes.length;
+        
+        debugPrint('BundledModelInstaller: Part ${i + 1} copied: ${bytes.length} bytes');
+      }
+      
+      await sink.flush();
+      await sink.close();
+      
+      debugPrint('BundledModelInstaller: Successfully assembled $filename from ${partPaths.length} parts');
+      debugPrint('BundledModelInstaller: Total size: $totalBytes bytes (${(totalBytes / (1024 * 1024)).toStringAsFixed(2)} MB)');
+      
+      // Verify the assembled file
+      final assembledSize = await targetFile.length();
+      if (assembledSize != totalBytes) {
+        throw ModelStorageException(
+          'File size mismatch after assembly. Expected: $totalBytes, Got: $assembledSize',
+          null,
+          '_assemblePartFiles',
+        );
+      }
+    } catch (e) {
+      // Clean up on error
+      await sink.close();
+      if (await targetFile.exists()) {
+        await targetFile.delete();
+      }
+      rethrow;
     }
   }
 

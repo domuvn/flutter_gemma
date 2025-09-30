@@ -6,11 +6,22 @@ import 'package:flutter_gemma/mobile/flutter_gemma_mobile.dart';
 /// 
 /// Setup steps:
 /// 1. Add model file to assets/ folder
+///    For models > 2GB, split into parts: your-model.bin.part1, .part2, etc.
+///    Use scripts/split_model.sh to split large files
+/// 
 /// 2. Declare in pubspec.yaml:
 ///    flutter:
 ///      assets:
-///        - assets/models/your-model.bin
+///        - assets/models/your-model.bin        # Single file
+///        # OR for large models:
+///        - assets/models/your-model.bin.part1  # Multi-part
+///        - assets/models/your-model.bin.part2
+///        - assets/models/your-model.bin.part3
+/// 
 /// 3. Run this example
+/// 
+/// Note: Multi-part files are auto-detected and assembled automatically.
+/// Just reference the base filename in modelUrl.
 class BundledModelExample extends StatefulWidget {
   const BundledModelExample({super.key});
 
