@@ -58,6 +58,7 @@ enum Model implements InferenceModelInterface {
     topK: 64,
     topP: 0.95,
     maxTokens: 1024,
+    supportsFunctionCalls: true,
   ),
 
   // Gemma 3 270M (Ultra-compact text-only model)
@@ -93,6 +94,7 @@ enum Model implements InferenceModelInterface {
     temperature: 0.1,
     topK: 40,
     topP: 0.95,
+    supportsFunctionCalls: true,
   ),
   gemma3nLocalAsset(
       // model file should be pre-downloaded and placed in the assets folder

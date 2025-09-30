@@ -1084,12 +1084,12 @@ Function calling is currently supported by the following models:
 
 ### ✅ Models with Function Calling Support
 - **Gemma 3 Nano** models (E2B, E4B) - Full function calling support
+- **Gemma 3 1B** - Function calling support
 - **Hammer 2.1 0.5B** - Action model with strong function calling capabilities  
 - **DeepSeek** models - Function calling + thinking mode support
 - **Qwen** models - Full function calling support
 
 ### ❌ Models WITHOUT Function Calling Support
-- **Gemma 3 1B** models - Text generation only
 - **Gemma 3 270M** - Text generation only
 - **TinyLlama 1.1B** - Text generation only
 - **Llama 3.2 1B** - Text generation only
